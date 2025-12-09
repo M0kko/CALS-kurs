@@ -138,11 +138,12 @@ class KPA_App(QMainWindow):
         layout.addWidget(QLabel("Расчет текущей остаточной стоимости оборудования:"))
         
         self.table_depr = QTableWidget()
-        self.table_depr.setColumnCount(6)
+        self.table_depr.setColumnCount(7)
         self.table_depr.setHorizontalHeaderLabels([
-            "Инв. №", "Тип", "Дата покупки", "Срок (мес)", "Исп. (мес)", "Ост. Стоимость (Руб)"
+            "Инв. №", "Тип", "Дата покупки", "Изнач. стоимость", "Срок (мес)", "Исп. (мес)", "Ост. Стоимость (Руб)"
         ])
         header = self.table_depr.horizontalHeader()
+        header.setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
         header.setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
         layout.addWidget(self.table_depr)
         
