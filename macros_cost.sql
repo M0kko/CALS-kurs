@@ -1,17 +1,19 @@
--- Макрос 1: Расчет амортизации и остаточной стоимости
--- Формула: Стоимость - (Стоимость * (Прожитые месяцы / Срок службы))
+-- Считает остаточную стоимость линейным методом по месяцам
 CREATE OR REPLACE VIEW view_depreciation AS
 SELECT 
     d.inventory_number,
-    dt.type_name,
+    STRING_AGG(dt.type_name, ', ') as type_name,
+    d.device_name,
     d.purchase_date,
     d.cost as initial_cost,
     d.service_life_months,
-    -- Расчет возраста в месяцах (приблизительно)
+    -- Сколько месяцев используется
     ROUND((EXTRACT(EPOCH FROM (NOW() - d.purchase_date)) / 2592000)::numeric, 1) as months_used,
-    -- Остаточная стоимость (если < 0, то 0)
+    -- Формула остаточной стоимости: Цена - (Цена * (ПрошлоМес / ВсегоМес))
     GREATEST(0, ROUND(
         (d.cost - (d.cost * (EXTRACT(EPOCH FROM (NOW() - d.purchase_date)) / 2592000) / NULLIF(d.service_life_months, 0)))::numeric, 
     2)) as current_value
 FROM devices d
-JOIN device_types dt ON d.type_id = dt.type_id;
+LEFT JOIN device_types_map map ON d.device_id = map.device_id
+LEFT JOIN device_types dt ON map.type_id = dt.type_id
+GROUP BY d.device_id;
