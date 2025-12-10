@@ -1,5 +1,4 @@
 import sys
-import json
 from PyQt6.QtWidgets import (QApplication, QMainWindow, QWidget, QVBoxLayout, 
                              QHBoxLayout, QTableWidget, QTableWidgetItem, 
                              QPushButton, QLabel, QTabWidget, QHeaderView, QMessageBox, QComboBox)
@@ -101,9 +100,9 @@ class KPA_App(QMainWindow):
 
         # Таблица
         self.table_devices = QTableWidget()
-        self.table_devices.setColumnCount(8)
+        self.table_devices.setColumnCount(9)
         self.table_devices.setHorizontalHeaderLabels([
-            "Инв. №", "Тип", "Серийный №", "Место", "Ответственный", "Статус", "Характеристики", "Срок поверки"
+            "Инв. №", "Тип", "Название", "Серийный №", "Место", "Ответственный", "Статус", "Характеристики", "Срок поверки"
         ])
         header = self.table_devices.horizontalHeader()
         header.setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
@@ -119,9 +118,9 @@ class KPA_App(QMainWindow):
         layout.addWidget(info_label)
 
         self.table_verification = QTableWidget()
-        self.table_verification.setColumnCount(6)
+        self.table_verification.setColumnCount(7)
         self.table_verification.setHorizontalHeaderLabels([
-            "Инв. №", "Тип", "Ответственный", "Локация", "Дата след. поверки", "Статус поверки"
+            "Инв. №", "Тип", "Название", "Ответственный", "Локация", "Дата след. поверки", "Статус поверки"
         ])
         header = self.table_verification.horizontalHeader()
         header.setSectionResizeMode(QHeaderView.ResizeMode.Stretch)
@@ -138,9 +137,9 @@ class KPA_App(QMainWindow):
         layout.addWidget(QLabel("Расчет текущей остаточной стоимости оборудования:"))
         
         self.table_depr = QTableWidget()
-        self.table_depr.setColumnCount(7)
+        self.table_depr.setColumnCount(8)
         self.table_depr.setHorizontalHeaderLabels([
-            "Инв. №", "Тип", "Дата покупки", "Изнач. стоимость", "Срок (мес)", "Исп. (мес)", "Ост. Стоимость (Руб)"
+            "Инв. №", "Тип", "Название", "Дата покупки", "Изнач. стоимость", "Срок (мес)", "Исп. (мес)", "Ост. Стоимость (Руб)"
         ])
         header = self.table_depr.horizontalHeader()
         header.setSectionResizeMode(QHeaderView.ResizeMode.ResizeToContents)
@@ -152,16 +151,24 @@ class KPA_App(QMainWindow):
     # --- ЛОГИКА ЗАГРУЗКИ ДАННЫХ ---
 
     def load_devices_data(self):
-        """Загрузка всех приборов с JOIN таблицами"""
+        """Загрузка приборов (device_name берем из таблицы devices)"""
         query = """
             SELECT 
-                d.inventory_number, dt.type_name, d.serial_number, 
-                l.name, e.last_name || ' ' || left(e.first_name, 1) || '.', 
-                d.status, d.passport_data, d.last_verification_date
+                d.inventory_number, 
+                STRING_AGG(dt.type_name, ', ') as type_names, 
+                d.device_name,
+                d.serial_number, 
+                l.name, 
+                e.last_name || ' ' || left(e.first_name, 1) || '.', 
+                d.status, 
+                d.passport_data, 
+                d.last_verification_date
             FROM devices d
-            JOIN device_types dt ON d.type_id = dt.type_id
+            LEFT JOIN device_types_map map ON d.device_id = map.device_id
+            LEFT JOIN device_types dt ON map.type_id = dt.type_id
             JOIN locations l ON d.location_id = l.location_id
             JOIN employees e ON d.responsible_id = e.employee_id
+            GROUP BY d.device_id, l.name, e.last_name, e.first_name
             ORDER BY d.device_id;
         """
         rows = self.db.fetch_query(query)
@@ -176,13 +183,13 @@ class KPA_App(QMainWindow):
         current_date = datetime.now().date()
         
         for row_idx, row_data in enumerate(rows):
-            # row_data: id, inv, type, last_date, interval, NEXT_DATE, loc, resp
+            # row_data: id, inv, type, device_name, last_date, interval, NEXT_DATE, loc, resp
             self.table_verification.insertRow(row_idx)
             
             # Отображаем нужные поля (Инв, Тип, Отв, Локация, Дата след.)
-            display_data = [row_data[1], row_data[2], row_data[7], row_data[6], str(row_data[5])]
+            display_data = [row_data[1], row_data[2], row_data[3], row_data[8], row_data[7], str(row_data[6])]
             
-            next_ver_date = row_data[5]
+            next_ver_date = row_data[6]
             days_left = (next_ver_date - current_date).days
             
             status_text = "OK"
@@ -193,7 +200,7 @@ class KPA_App(QMainWindow):
                 color = Qt.GlobalColor.red
             elif days_left < 30:
                 status_text = f"Поверить в этом месяце"
-                color = Qt.GlobalColor.yellow
+                color = Qt.GlobalColor.darkYellow
             else:
                 status_text = f"Через {days_left} дн."
 
